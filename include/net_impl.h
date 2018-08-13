@@ -9,19 +9,20 @@
 
 typedef struct {
     gchar *match_id;
-    guint n_args;
     void *function;
 } callback_t;
 
-void mount_cb(gpointer userdata, char *mount);
+char * mount_cb(gpointer userdata, char *mount);
 
-void unmount_cb(gpointer userdata, char *mount);
+char * unmount_cb(gpointer userdata, char *mount);
 
-void player_next_cb(gpointer userdata);
+char * player_next_cb(gpointer userdata, char *cmd);
 
-void player_prev_cb(gpointer userdata);
+char *player_prev_cb(gpointer userdata, char *cmd);
 
-void player_play_cb(gpointer userdata);
+char *player_play_cb(gpointer userdata, char *cmd);
+
+char *player_pause_cb(gpointer userdata, char *cmd) ;
 
 const callback_t * net_impl_cbs();
 

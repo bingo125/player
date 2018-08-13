@@ -9,6 +9,12 @@
 #define FD_SIZE (5)
 typedef void (*FUNC)( gpointer userdata, char *mount);
 
+
+typedef struct {
+	char * str;
+	int fd;
+}write_buf_t;
+
 typedef struct {
     gboolean  should_quit;
     int listen_socket;
@@ -17,16 +23,18 @@ typedef struct {
     FUNC unmount_cb;
     gpointer userdata;
     int client[FD_SIZE];
+    GList * write_buf;
+
 }usb_monitor_t;
 
 
 
 static void *pthread_runting(void *);
 
-void usb_monitior_blocked_notice(usb_monitor_t * usb_monitor, FUNC mount_cb, FUNC unmount_cb, gpointer userdata);
+void usb_monitior_blocked_notice(usb_monitor_t * usb_monitor, gpointer userdata);
 
 
 usb_monitor_t * usb_monitor_new();
 void usb_monitor_destor(usb_monitor_t ** pp_usb_monitor);
 #endif //GST_PLAY_USB_SCAN_H
-static void handle_message(usb_monitor_t * usb_monitor, const char * message);
+static write_buf_t * handle_recieve_message(usb_monitor_t *usb_monitor, int fd, const char *message);

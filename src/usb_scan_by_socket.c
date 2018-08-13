@@ -15,7 +15,8 @@
 
 typedef void (*FUNC)(gpointer userdata, char *mount);
 
-void usb_monitior_blocked_notice(usb_monitor_t *usb_monitor, FUNC mount_cb, FUNC unmount_cb, gpointer userdata);
+//void usb_monitior_blocked_notice(usb_monitor_t *usb_monitor, FUNC mount_cb, FUNC unmount_cb, gpointer userdata);
+void usb_monitior_blocked_notice(usb_monitor_t *usb_monitor, gpointer userdata);
 
 usb_monitor_t *usb_monitor_new();
 
@@ -64,10 +65,19 @@ usb_monitor_t *usb_monitor_new() {
     memset(&usb_monitor->client, -1, sizeof(usb_monitor->client));
     return usb_monitor;
 }
+//
+//void usb_monitior_blocked_notice(usb_monitor_t *usb_monitor, FUNC mount_cb, FUNC unmount_cb, gpointer userdata) {
+//    usb_monitor->mount = mount_cb;
+//    usb_monitor->unmount_cb = unmount_cb;
+//    usb_monitor->userdata = userdata;
+//    pthread_create(&usb_monitor->id, NULL, pthread_runting, usb_monitor);
+//    usb_monitor->should_quit = FALSE;
+//}
 
-void usb_monitior_blocked_notice(usb_monitor_t *usb_monitor, FUNC mount_cb, FUNC unmount_cb, gpointer userdata) {
-    usb_monitor->mount = mount_cb;
-    usb_monitor->unmount_cb = unmount_cb;
+
+void usb_monitior_blocked_notice(usb_monitor_t *usb_monitor, gpointer userdata) {
+//    usb_monitor->mount = mount_cb;
+//    usb_monitor->unmount_cb = unmount_cb;
     usb_monitor->userdata = userdata;
     pthread_create(&usb_monitor->id, NULL, pthread_runting, usb_monitor);
     usb_monitor->should_quit = FALSE;
@@ -90,6 +100,21 @@ void usb_monitor_destor(usb_monitor_t **pp_usb_monitor) {
     *pp_usb_monitor = NULL;
 }
 
+void handle_write_message(usb_monitor_t * usb_monitor){
+
+    GList * iterator = usb_monitor ->write_buf;
+    char buf[1024];
+    write_buf_t *write_buf = NULL;
+    for (; iterator; iterator= iterator->next) {
+        write_buf = (write_buf_t *) iterator->data;
+        send(write_buf->fd, write_buf->str, strlen(write_buf->str) + 1, MSG_SYN);
+        free(write_buf->str);
+        write_buf->str = NULL;
+    }
+    g_list_free(iterator);
+    usb_monitor ->write_buf = NULL;
+}
+
 void *pthread_runting(void *userdata) {
     usb_monitor_t *usb_monitor = (usb_monitor_t *) userdata;
     struct sockaddr_in cliaddr;
@@ -107,11 +132,12 @@ void *pthread_runting(void *userdata) {
     while (!usb_monitor->should_quit) {
         fd_set tmp_fds = fds;
         time_lapse.tv_sec = 0;
-        time_lapse.tv_usec = 300;
+        time_lapse.tv_usec = 10 *1000;
 
         switch (select(maxfd + 1, &tmp_fds, NULL, NULL, &time_lapse)) {
             case 0:
 //                printf(" time is time_lapse and try again \n");
+                handle_write_message(usb_monitor);
                 break;
             case -1:
                 perror(" xxxxxx");
@@ -153,7 +179,10 @@ void *pthread_runting(void *userdata) {
                                     buf[ret - 1] = '\0';
                                 }
                                 printf("%d---------%s \n", ret, buf);
-                                handle_message(usb_monitor, buf);
+                                write_buf_t *user_data =  handle_recieve_message(usb_monitor, usb_monitor->client[i], buf);
+                                if (user_data) {
+                                    usb_monitor->write_buf = g_list_append(usb_monitor->write_buf, user_data);
+                                }
                             }
                         }
                     }
@@ -173,9 +202,8 @@ typedef struct  {
 callback_t *
 #endif
 
-typedef void (*func1)(gpointer);
 
-typedef void (*func2)(gpointer, const char *);
+typedef char * (*func2)(gpointer, const char *);
 
 static gboolean call_back_match(const callback_t * p_cb, const gchar * message, int *pi){
     int len = strlen(p_cb->match_id);
@@ -189,26 +217,30 @@ static gboolean call_back_match(const callback_t * p_cb, const gchar * message, 
     *pi = i;
     return TRUE;
 }
-static void handle_message(usb_monitor_t *usb_monitor, const char *message) {
+static write_buf_t * handle_recieve_message(usb_monitor_t *usb_monitor, int fd, const char *message) {
     gboolean ret;
+    char * pch = NULL;
     int i;
     const callback_t *ptr_cb = net_impl_cbs();
     gboolean flag ;
+    write_buf_t *ret_val = NULL;
     while (ptr_cb->function != NULL) {
         int len = strlen(ptr_cb->match_id);
         flag = TRUE;
         if(call_back_match(ptr_cb, message, &i)){
             if(ptr_cb->function){
-                if (!ptr_cb->n_args) {
-                     ((func1) (ptr_cb->function))(usb_monitor->userdata);
-                } else {
-                     ((func2) (ptr_cb->function))(usb_monitor->userdata, &message[i]);
-                }
+                pch = ((func2) (ptr_cb->function))(usb_monitor->userdata, &message[i]);
             }
-            return;
+            if(pch){
+                ret_val = g_new0(write_buf_t, 1);
+                ret_val->fd = fd;
+                ret_val->str = pch;
+            }
+            return ret_val;
         }
         ptr_cb ++;
     }
 
     g_print("unspect message %s \n", message);
+    return NULL;
 }

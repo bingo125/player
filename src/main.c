@@ -418,7 +418,7 @@ int main(int argc, char *argv[]) {
 //    if (err != 0) {
 //        printf("cont creat the pthread \n");
 //    }
-    usb_monitior_blocked_notice(data.usb_monitor, mount_cb, unmount_cb, &data);
+    usb_monitior_blocked_notice(data.usb_monitor, &data);
     player_play(&data);
     g_main_loop_run(data.loop);
     gst_free(&data);
