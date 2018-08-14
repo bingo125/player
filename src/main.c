@@ -126,39 +126,34 @@ static void scan_dir(const gchar *dir_name, play_list_t *play_list) {
     g_list_free(dirList);
 }
 
-static void listShow(gpointer data, gpointer user_data) {
-    gchar *ptr = (gchar *) data;
-    g_print(" list :%s\n", ptr);
-}
-
 static void analyze_streams(gst_data *data) {
     gint i;
     GstTagList *tags;
     gchar *str;
     guint rate;
-    gint n_video, n_audio, n_text;
-    n_video = n_audio = n_text = 0;
-
-    /* Read some properties */
-    g_object_get(data->playbin, "n-audio", &n_audio, NULL);
     g_print("analyze_streams \n");
+    play_list_t * play_list = data->play_list;
     for (i = 0; i < 1; i++) {
         tags = NULL;
         /* Retrieve the stream's audio tags */
         g_signal_emit_by_name(data->playbin, "get-audio-tags", i, &tags);
         if (tags) {
             g_print("audio stream %d:\n", i);
+			if (gst_tag_list_get_string(tags, GST_TAG_TITLE, &str)) {
+				g_print("  GST_TAG_TITLE: %s\n", str);
+                play_list_set_title(play_list, str);
+			}
             if (gst_tag_list_get_string(tags, GST_TAG_AUDIO_CODEC, &str)) {
                 g_print("  codec: %s\n", str);
                 g_free(str);
             }
             if (gst_tag_list_get_string(tags, GST_TAG_ARTIST, &str)) {
                 g_print("  ARTIST: %s\n", str);
-                g_free(str);
+                play_list_set_artist(play_list, str);
             }
             if (gst_tag_list_get_string(tags, GST_TAG_ALBUM, &str)) {
                 g_print("  ALBUM: %s\n", str);
-                g_free(str);
+                play_list_set_album(play_list, str);
             }
             if (gst_tag_list_get_string(tags, GST_TAG_LANGUAGE_CODE, &str)) {
                 g_print("  language: %s\n", str);
@@ -170,31 +165,12 @@ static void analyze_streams(gst_data *data) {
             gst_tag_list_unref(tags);
         }
     }
-
-    g_print("\n");
-    for (i = 0; i < n_text; i++) {
-        tags = NULL;
-        /* Retrieve the stream's subtitle tags */
-        g_signal_emit_by_name(data->playbin, "get-text-tags", i, &tags);
-        if (tags) {
-            g_print("subtitle stream %d:\n", i);
-            if (gst_tag_list_get_string(tags, GST_TAG_LANGUAGE_CODE, &str)) {
-                g_print("  language: %s\n", str);
-                g_free(str);
-            }
-            gst_tag_list_unref(tags);
-        }
-    }
 }
 
 static gboolean play_bus_msg(GstBus *bus, GstMessage *msg, gpointer user_data) {
     GError *err;
     gchar *debug_info;
     gst_data *pdata = (gst_data *) user_data;
-    GstTagList *tag_list = NULL;
-    gchar *artist = NULL;
-    gchar *album = NULL;
-    gchar *data = NULL;
     GstElement *playbin = pdata->playbin;
 
     switch (GST_MESSAGE_TYPE(msg)) {
@@ -209,6 +185,7 @@ static gboolean play_bus_msg(GstBus *bus, GstMessage *msg, gpointer user_data) {
             break;
         case GST_MESSAGE_EOS:
             g_print("End-Of-Stream reached.\n");
+            play_list_clear_titil_album_artist(pdata->play_list);
             if (pdata->state == cust_play) {
                 player_next(pdata);
             }
@@ -217,17 +194,18 @@ static gboolean play_bus_msg(GstBus *bus, GstMessage *msg, gpointer user_data) {
             break;
         case GST_MESSAGE_STATE_CHANGED: {
             /* g_printf("GST_MESSAGE_STATE_CHANGED \n"); */
-            GstState old_state, new_state, pending_state;
+            GstState old_state, new_state;
             gst_message_parse_state_changed(msg, &old_state, &new_state, NULL);
 
-            g_print ("Pipeline state changed from %s to %s:  \n", gst_element_state_get_name (old_state), gst_element_state_get_name (new_state));
-
+//            g_print ("Pipeline state changed from %s to %s:  \n", gst_element_state_get_name (old_state), gst_element_state_get_name (new_state));
 
             if (GST_STATE_PLAYING == new_state) {
                 if (msg->src) {
                     gchar *pch = GST_OBJECT_NAME (msg->src);
                     g_print("%s\n", pch);
-                    analyze_streams(pdata);
+                    if(!strcmp(pch, "audio")){
+						analyze_streams(pdata);
+					}
                 }
             }
             break;
@@ -239,6 +217,8 @@ static gboolean play_bus_msg(GstBus *bus, GstMessage *msg, gpointer user_data) {
 
 
         }
+		default:
+			break;
             /*default:*/
             /*g_printerr("Unexpected message received.\n");*/
     }
@@ -302,6 +282,67 @@ void player_next(gst_data *pdata) {
         play(pdata, TRUE);
     }
 }
+int ns2s(gint64 ns){
+    return (ns/1000/1000/1000);
+}
+
+char *play_query_duration(gst_data *pdata, char *buf) {
+	gint64 dur;
+	gst_element_query_duration(pdata->playbin, GST_FORMAT_TIME, &dur);
+    sprintf(buf,"%d",  ns2s(dur));
+    return buf;
+}
+
+
+char *play_query_status(gst_data *pdata, char *buf) {
+    GstState state;
+    gst_element_get_state(pdata->playbin, &state, NULL,GST_CLOCK_TIME_NONE);
+    if (state == GST_STATE_PLAYING) {
+        sprintf(buf, "%s", "play");
+    }else{
+        sprintf(buf, "%s", "pause");
+    }
+    return buf;
+}
+
+char *play_query_file_names(gst_data *pdata, int min,int max, char *buf) {
+    play_list_get_file_names(pdata->play_list, min, max, buf);
+    return buf;
+}
+
+
+char *play_query_abulum(gst_data *pdata, char *buf) {
+    play_list_get_album(pdata->play_list, buf);
+    return buf;
+}
+
+char *play_query_title(gst_data *pdata, char *buf){
+    play_list_get_title(pdata->play_list, buf);
+    return buf;
+}
+
+char *play_query_singer(gst_data *pdata, char *buf) {
+    play_list_get_artist(pdata->play_list, buf);
+    return buf;
+}
+
+char * play_query_totals_songs(gst_data *pdata, char *buf){
+    play_list_get_totals_songs(pdata->play_list, buf);
+    return buf;
+}
+
+char * play_query_cur_offset(gst_data *pdata, char *buf){
+    play_list_get_cur_offset(pdata->play_list, buf);
+    return buf;
+}
+
+char *play_query_position(gst_data *pdata, char *buf) {
+	gint64 off;
+	gst_element_query_position(pdata->playbin, GST_FORMAT_TIME, &off);
+    sprintf(buf,"%d",  ns2s(off));
+    return buf;
+}
+
 
 void player_play(gst_data *pdata) {
     switch (pdata->state) {
@@ -340,10 +381,6 @@ static void gst_free(gst_data *pdata) {
     g_main_loop_unref(pdata->loop);
     play_list_destroy(&pdata->play_list);
     usb_monitor_destor(&pdata->usb_monitor);
-}
-
-static void each_callback(gpointer data, gpointer user_data) {
-    g_print("element:%s \n", (gchar *) data);
 }
 
 void player_list_add(gst_data *pdata, const char *dir_name) {
@@ -405,9 +442,8 @@ void *add_function(void *data) {
 #endif
 
 int main(int argc, char *argv[]) {
-    int err;
     gst_data data;
-    pthread_t id;
+    pthread_t id = 0;
     gst_init(NULL, NULL);
     printf("Locale is: %s\n", setlocale(LC_ALL, "zh_CN.utf8"));
     music_init(&data);

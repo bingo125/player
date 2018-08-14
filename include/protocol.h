@@ -14,8 +14,6 @@
 #define user_data (0xff)
 
 // MCU  TO ARM
-const unsigned char tst_mcu_cmd_mute[] = {0x55, 0xaa, 0x08, seq_bit, 0x0c, 0x01, 0x01, crc_bit};
-const char tst_mcu_cmd_mute_str[] = {"player cmd mut"};
 
 const unsigned char mcu_cmd_mute[] = {0x55, 0xaa, 0x08, seq_bit, 0x0c, 0x01, 0x01, crc_bit};
 #define mcu_cmd_mute_str "player cmd mut"

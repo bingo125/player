@@ -29,7 +29,6 @@ typedef struct {
 
 
 
-static void *pthread_runting(void *);
 
 void usb_monitior_blocked_notice(usb_monitor_t * usb_monitor, gpointer userdata);
 
@@ -37,4 +36,3 @@ void usb_monitior_blocked_notice(usb_monitor_t * usb_monitor, gpointer userdata)
 usb_monitor_t * usb_monitor_new();
 void usb_monitor_destor(usb_monitor_t ** pp_usb_monitor);
 #endif //GST_PLAY_USB_SCAN_H
-static write_buf_t * handle_recieve_message(usb_monitor_t *usb_monitor, int fd, const char *message);
