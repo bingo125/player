@@ -4,11 +4,42 @@
 
 #include <memory.h>
 #include <stdio.h>
+
 #include "net_impl.h"
 #include "player.h"
 #include "protocol.h"
 #include "usb_scan.h"
 static GList ** _write_buf = NULL;
+
+char *play_info_pause_cb(callback_t *cb, char *cmd, gpointer userdata) ;
+char *player_feedback_status_cb(callback_t *cb, char *cmd, gpointer userdata);
+char *player_info_songs_name_cb(callback_t *cb, char *cmd, gpointer userdata) ;
+char *player_info_abulum_cb(callback_t *cb, char *cmd, gpointer userdata) ;
+char *player_info_singer_cb(callback_t *cb, char *cmd, gpointer userdata) ;
+char *player_info_title_cb(callback_t *cb, char *cmd, gpointer userdata) ;
+char *player_info_cur_offset_cb(callback_t *cb, char *cmd, gpointer userdata) ;
+char *player_info_totals_songs_cb(callback_t *cb, char *cmd, gpointer userdata) ;
+
+char * mount_cb(callback_t *cb ,char *cmd,gpointer userdata);
+
+char * unmount_cb(callback_t *cb ,char *cmd,gpointer userdata);
+
+char * player_toggle_play_pause_cb(callback_t *cb ,char *cmd,gpointer userdata);
+
+
+char * player_next_cb(callback_t *cb ,char *cmd,gpointer userdata);
+
+char *player_prev_cb(callback_t *cb ,char *cmd,gpointer userdata);
+
+char *player_play_cb(callback_t *cb ,char *cmd,gpointer userdata);
+
+char *player_pause_cb(callback_t *cb ,char *cmd,gpointer userdata) ;
+
+char *player_info_cur_cb(callback_t *cb ,char *cmd,gpointer userdata);
+
+char *player_info_duration_cb(callback_t *cb, char *cmd, gpointer userdata);
+//callback_t *net_impl_cbs();
+
 char *mount_cb(callback_t *cb, char *cmd, gpointer userdata) {
 
 	g_print("mount:%s\n", cmd);
@@ -23,6 +54,11 @@ char *unmount_cb(callback_t *cb, char *cmd, gpointer userdata) {
 	return NULL;
 }
 
+char *player_toggle_play_pause_cb(callback_t *cb, char *cmd, gpointer userdata) {
+	g_print("player_next_cb:\n");
+	player_toggle_play_pause(userdata);
+	return NULL;
+}
 char *player_next_cb(callback_t *cb, char *cmd, gpointer userdata) {
 	g_print("player_next_cb:\n");
 	player_next(userdata);
@@ -47,7 +83,7 @@ char *player_pause_cb(callback_t *cb, char *cmd, gpointer userdata) {
 	return NULL;
 }
 
-char *play_info_pause(callback_t *cb, char *cmd, gpointer userdata) {
+char *play_info_pause_cb(callback_t *cb, char *cmd, gpointer userdata) {
 	g_print("play_info_pause:\n");
 	return strdup("player info plause");
 }
@@ -70,7 +106,7 @@ char *player_info_duration_cb(callback_t *cb, char *cmd, gpointer userdata) {
 	return strdup(ret);
 }
 
-char *player_feedback_status(callback_t *cb, char *cmd, gpointer userdata) {
+char *player_feedback_status_cb(callback_t *cb, char *cmd, gpointer userdata) {
 	char buf[BUF_SZ];
 	char ret[BUF_SZ];
 	play_query_status(userdata, buf);
@@ -79,14 +115,16 @@ char *player_feedback_status(callback_t *cb, char *cmd, gpointer userdata) {
 }
 
 #include "player.h"
-char *player_info_songs_name(callback_t *cb, char *cmd, gpointer userdata) {
-	char buf[BUF_SZ];
-	char ret[BUF_SZ];
-
+char *player_info_songs_name_cb(callback_t *cb, char *cmd, gpointer userdata) {
+	char buf[BUFSIZ] ={0};
+	int len;
+	GRegex* regex = NULL;
+	GMatchInfo *match_info = NULL;
+	gchar *pch = NULL;
 	gint min , max;
 	min = max = -1;
-	GRegex* regex;
-	GMatchInfo *match_info;
+
+
 	regex = g_regex_new("[0-9]+", 0 , 0, NULL);
 	g_regex_match(regex, cmd, 0, &match_info);
 	while (g_match_info_matches(match_info)) {
@@ -102,15 +140,14 @@ char *player_info_songs_name(callback_t *cb, char *cmd, gpointer userdata) {
 	}
 	g_match_info_free(match_info);
 	g_regex_unref(regex);
-	play_query_file_names(userdata, min, max, buf);
-
-	sprintf(ret, "%s=%s", cb->freeback, buf);
-	return strdup(ret);
-
+	len = play_query_file_names(userdata, min, max, buf,cb->freeback);
+	pch=(gchar*) malloc(500);
+	memcpy(pch ,buf, len);
+	return pch;
 }
 
 
-char *player_info_abulum(callback_t *cb, char *cmd, gpointer userdata) {
+char *player_info_abulum_cb(callback_t *cb, char *cmd, gpointer userdata) {
 	char buf[BUF_SZ];
 	char ret[BUF_SZ];
 	play_query_abulum(userdata, buf);
@@ -118,7 +155,7 @@ char *player_info_abulum(callback_t *cb, char *cmd, gpointer userdata) {
 	return strdup(ret);
 }
 
-char *player_info_singer(callback_t *cb, char *cmd, gpointer userdata) {
+char *player_info_singer_cb(callback_t *cb, char *cmd, gpointer userdata) {
 	char buf[BUF_SZ];
 	char ret[BUF_SZ];
 	play_query_singer(userdata, buf);
@@ -126,7 +163,7 @@ char *player_info_singer(callback_t *cb, char *cmd, gpointer userdata) {
 	return strdup(ret);
 }
 
-char *player_info_title(callback_t *cb, char *cmd, gpointer userdata) {
+char *player_info_title_cb(callback_t *cb, char *cmd, gpointer userdata) {
 	char buf[BUF_SZ];
 	char ret[BUF_SZ];
 	play_query_title(userdata, buf);
@@ -134,7 +171,7 @@ char *player_info_title(callback_t *cb, char *cmd, gpointer userdata) {
 	return strdup(ret);
 }
 
-char *player_info_cur_offset(callback_t *cb, char *cmd, gpointer userdata) {
+char *player_info_cur_offset_cb(callback_t *cb, char *cmd, gpointer userdata) {
 	char buf[BUF_SZ];
 	char ret[BUF_SZ];
 	play_query_cur_offset(userdata, buf);
@@ -142,7 +179,7 @@ char *player_info_cur_offset(callback_t *cb, char *cmd, gpointer userdata) {
 	return strdup(ret);
 }
 
-char *player_info_totals_songs(callback_t *cb, char *cmd, gpointer userdata) {
+char *player_info_totals_songs_cb(callback_t *cb, char *cmd, gpointer userdata) {
 	char buf[BUF_SZ];
 	char ret[BUF_SZ];
 	play_query_totals_songs(userdata, buf);
@@ -150,10 +187,9 @@ char *player_info_totals_songs(callback_t *cb, char *cmd, gpointer userdata) {
 	return strdup(ret);
 }
 
-#define MOUNT "VOLUME MOUNT="
-#define UNMOUNT "VOLUME UNMOUNT="
 
-callback_t callbacks[] = {
+
+static callback_t callbacks[] = {
 	{
 		.match_id =MOUNT,
 		.freeback = NULL,
@@ -162,6 +198,11 @@ callback_t callbacks[] = {
 	{
 		.match_id = UNMOUNT,
 		.function = unmount_cb,
+		.freeback = NULL,
+	},
+	{
+		.match_id = mcu_cmd_play_toggle_str,
+		.function = player_toggle_play_pause_cb,
 		.freeback = NULL,
 	},
 	{
@@ -188,7 +229,7 @@ callback_t callbacks[] = {
 	{
 		.match_id = mcu_info_play_pause_str,
 		.freeback = arm_feedback_play_pause_str,
-		.function = player_feedback_status,
+		.function = player_feedback_status_cb,
 
 	},
 	{
@@ -209,32 +250,32 @@ callback_t callbacks[] = {
 	{
 		.match_id = mcu_info_index_str,
 		.freeback = arm_feedback_cur_str,
-		.function = player_info_cur_offset,
+		.function = player_info_cur_offset_cb,
 	},
 	{
 		.match_id = mcu_info_total_str,
 		.freeback = arm_feedback_total_song_str,
-		.function = player_info_totals_songs,
+		.function = player_info_totals_songs_cb,
 	},
 	{
 		.match_id = mcu_info_name_str,
 		.freeback = arm_feedback_name_str,
-		.function = player_info_title,
+		.function = player_info_title_cb,
 	},
 	{
 		.match_id = mcu_info_singer_str,
 		.freeback = arm_feedback_singer_str,
-		.function = player_info_singer,
+		.function = player_info_singer_cb,
 	},
 	{
 		.match_id = mcu_info_ablume_str,
 		.freeback = arm_feedback_ablum_str,
-		.function = player_info_abulum,
+		.function = player_info_abulum_cb,
 	},
 	{
 		.match_id = mcu_info_file_name_str,
 		.freeback = arm_feedback_file_names_str,
-		.function = player_info_songs_name,
+		.function = player_info_songs_name_cb,
 		.muti_char= TRUE,
 	},
 	{
@@ -244,7 +285,7 @@ callback_t callbacks[] = {
 };
 
 //todo 后续此处使用二叉搜索，加快搜索速度
-callback_t *net_impl_cbs() {
+callback_t *net_impl_cbs(void) {
 	return callbacks;
 }
 

@@ -5,10 +5,6 @@
 #ifndef SERIAL_BK_PROTOCOL_H
 #define SERIAL_BK_PROTOCOL_H
 
-#ifdef SEARIAL
-#include <cstring>
-#include "message.h"
-#endif //SEARIAL
 
 #define ARRSIZE(arr) (sizeof(arr)/sizeof(arr[0]))
 
@@ -129,13 +125,5 @@ const unsigned char arm_send_player_status[] = {0xaa, 0x55, 0x08, seq_bit, 0x0c,
 
 #define MOUNT "VOLUME MOUNT="
 #define UNMOUNT "VOLUME UNMOUNT="
-#ifdef SEARIAL
-typedef void (*a2m_spec_func)(message *msg, const char * arm_cmd);
-typedef void (*m2a_spec_func)(message *msg, const char * arm_cmd);
-void str_2_byte(message *msg, const char * arm_cmd);
-void str_4_byte(message *msg, const char * arm_cmd);
-message *  a2m_common(const char * arm_cmd , message * msg, a2m_spec_func func = NULL);
-void  a2m_file_name( message * msg, const char * arm_cmd);
-#endif  //SEARIAL
 
 #endif //SERIAL_BK_PROTOCOL_H

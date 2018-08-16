@@ -1,7 +1,7 @@
 //
 // Created by bingo on 18-7-28.
 
-#include "../include/usb_scan.h"
+#include "usb_scan.h"
 
 #include "libue.h"
 
@@ -85,7 +85,7 @@ int ue_init_listener(struct uevent_listener *l) {
 int ue_wait_for_event(struct uevent_listener *l, struct uevent *uevp) {
     ue_reset_event(uevp);
     while (poll(&(l->pfd), 1, -1) != -1) {
-        int i, len = recv(l->pfd.fd, uevp->buf, sizeof(uevp->buf), MSG_DONTWAIT);
+        int len = recv(l->pfd.fd, uevp->buf, sizeof(uevp->buf), MSG_DONTWAIT);
         if (len == -1) return ERR_LISTENER_RECV;
         if (ue_parse_event_msg(uevp, len) == 0) {
             UE_DEBUG("uevent successfully parsed\n");

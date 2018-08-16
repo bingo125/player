@@ -5,7 +5,11 @@
 #include "play_list.h"
 #include <string.h>
 #include <pthread.h>
-#include <gst/gsturi.h>
+#include <gst/gstprotection.h>
+
+static void song_free(gpointer data);
+
+
 
 typedef struct _play_list_t {
 	GList *songs;
@@ -45,11 +49,15 @@ gboolean play_list_get_artist(play_list_t *play_list, gchar *buf) {
 }
 
 gboolean play_list_get_title(play_list_t *play_list, gchar *buf) {
-
+	char * path= NULL;
+	char * file=NULL;
 	if (play_list->iterator) {
 		song_t *song = (song_t *) (play_list->iterator->data);
-		if (song->title) {
-			sprintf(buf, "%s", song->title);
+		if(song->file_name){
+			path = gst_uri_get_location(song->file_name);
+			file = strrchr(path, '/') +1;
+			sprintf(buf, "%s", file);
+			free(path);
 			return TRUE;
 		}
 	}
@@ -68,22 +76,21 @@ gboolean play_list_get_album(play_list_t *play_list, gchar *buf) {
 
 }
 
-gboolean play_list_get_file_names(play_list_t *play_list, gint min, gint max, gchar *buf) {
+int play_list_get_file_names(play_list_t *play_list, gint min, gint max, gchar *buf,const gchar *prefix) {
 //	play_list->songs->prev->next = NULL;
 	int offset = 0;
+	int i ;
 	GList *itr = g_list_nth(play_list->songs, min);
-	for (int i = min; itr && i < max; i++, itr = itr->next) {
+	for (i = min; itr && i <= max; i++, itr = itr->next) {
 		char * url = ((song_t *) (itr->data))->file_name;
 		char * path = gst_uri_get_location(url);
 		char * file = strrchr(path, '/') +1;
-		sprintf(buf+offset, "%d:%s", i, file);
+        sprintf(buf+offset, "%s=%d:%s", prefix,i, file);
 		printf("%s\n",buf +offset);
 		offset +=  strlen(buf +offset) +1;
 		free(path);
 	}
-//	play_list->songs->prev->next = play_list->songs;
-
-	return TRUE;
+    return offset+1;
 }
 
 void play_list_set_artist(play_list_t *play_list, gchar *buf){
@@ -133,9 +140,9 @@ void play_list_clear_titil_album_artist(play_list_t *play_list){
 }
 
 
-static void song_free(gpointer data);
 
-play_list_t *play_list_new() {
+
+play_list_t *play_list_new(void) {
 	song_t *ptr_song = g_new0(song_t, 1);
 	play_list_t *play = g_new(play_list_t, 1);
 	if (ptr_song == NULL || play == NULL) {
@@ -185,19 +192,22 @@ static gboolean play_list_remove_compare(gpointer userdata, gchar *name) {
 }
 
 void play_list_remove_by_name(play_list_t *play_list, gchar *name) {
+	GList **pinterator = NULL;
+	GList *next = NULL;
+	GList *iterator =NULL;
 	pthread_mutex_lock(&play_list->lock);
-	GList **pinterator = &play_list->iterator;
+	pinterator = &play_list->iterator;
 	while (*pinterator && play_list_remove_compare((*pinterator)->data, name)) {
 		song_free((*pinterator)->data);
-		GList *next = (*pinterator)->next;
+		next = (*pinterator)->next;
 		play_list->songs = g_list_delete_link(play_list->songs, *pinterator);
 		*pinterator = next;
 	}
-	GList *iterator = play_list->songs;
+	iterator = play_list->songs;
 	while (iterator) {
 		if (play_list_remove_compare(iterator->data, name)) {
 			song_free(iterator->data);
-			GList *next = iterator->next;
+			next = iterator->next;
 			play_list->songs = g_list_delete_link(play_list->songs, iterator);
 			iterator = next;
 			continue;
@@ -238,6 +248,7 @@ void play_list_destroy(play_list_t **play_list) {
 }
 
 gchar *play_list_next(play_list_t *play_list) {
+	gchar *pch = NULL;
 	pthread_mutex_lock(&play_list->lock);
 	if (g_list_length(play_list->songs) == 1) {
 		pthread_mutex_unlock(&play_list->lock);
@@ -251,13 +262,14 @@ gchar *play_list_next(play_list_t *play_list) {
 		play_list->iterator = play_list->songs->next;
 	}
 
-	gchar *pch = ((song_t *) play_list->iterator->data)->file_name;
+	pch = ((song_t *) play_list->iterator->data)->file_name;
 	play_list->iterator = play_list->iterator->next;
 	pthread_mutex_unlock(&play_list->lock);
 	return pch;
 }
 
 gchar *play_list_pre(play_list_t *play_list) {
+	gchar *pch = NULL;
 	pthread_mutex_lock(&play_list->lock);
 	if (g_list_length(play_list->songs) == 1) {
 		pthread_mutex_unlock(&play_list->lock);
@@ -276,7 +288,7 @@ gchar *play_list_pre(play_list_t *play_list) {
 	} else {
 		play_list->iterator = play_list->iterator->prev;
 	}
-	gchar *pch = ((song_t *) play_list->iterator->data)->file_name;
+	pch = ((song_t *) play_list->iterator->data)->file_name;
 	pthread_mutex_unlock(&play_list->lock);
 	return pch;
 }
@@ -294,8 +306,9 @@ void play_list_show(play_list_t *play_list) {
 
 gboolean play_list_is_empty(play_list_t *play_list) {
 	int i = 0;
+	GList *iterator = NULL;
 	//第一个元素是哨兵，避免代码里面对空的判断
-	for (GList *iterator = play_list->songs;
+	for (iterator = play_list->songs;
 		 iterator && i < 2; iterator = iterator->next) {
 		i++;
 	}

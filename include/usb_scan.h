@@ -28,11 +28,12 @@ typedef struct {
 }usb_monitor_t;
 
 
-
+usb_monitor_t *usb_monitor_new(void);
 
 void usb_monitior_blocked_notice(usb_monitor_t * usb_monitor, gpointer userdata);
 
 
-usb_monitor_t * usb_monitor_new();
 void usb_monitor_destor(usb_monitor_t ** pp_usb_monitor);
+
+
 #endif //GST_PLAY_USB_SCAN_H

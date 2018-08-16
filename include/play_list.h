@@ -14,7 +14,7 @@ play_list_t *play_list_add_song(play_list_t *play_list, gchar *file_name, gchar 
 
 void play_list_remove_by_name(play_list_t *play_list, gchar *name);
 
-play_list_t *play_list_new();
+play_list_t *play_list_new(void);
 
 void play_list_destroy(play_list_t **play_list);
 
@@ -44,6 +44,6 @@ void play_list_set_album(play_list_t *play_list, gchar *buf);
 
 void play_list_clear_titil_album_artist(play_list_t *play_list);
 
-gboolean play_list_get_file_names(play_list_t *play_list, gint min, gint max, gchar *buf);
+int  play_list_get_file_names(play_list_t *play_list, gint min, gint max, gchar *buf,const gchar *prefix);
 
 #endif //GST_PLAY_PLAY_LIST_H

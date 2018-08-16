@@ -40,6 +40,8 @@ static void music_scan(gst_data *pdata, const gchar *dir_name);
 
 static void music_song_remove(gst_data *pdata, const gchar *dir_name);
 
+static int ns2s(gint64 ns);
+
 gchar music[][8] =
         {
                 {".flac"},
@@ -49,9 +51,10 @@ gchar music[][8] =
         };
 
 static gboolean music_compare(const gchar *name) {
+    int i;
     int sz = sizeof(music) / sizeof(music[0]);
     gint result = 0;
-    for (int i = 0; i < sz; i++) {
+    for (i = 0; i < sz; i++) {
         if (!(result = strcmp(name, music[i]))) {
             return TRUE;
         }
@@ -86,6 +89,7 @@ static void scan_dir(const gchar *dir_name, play_list_t *play_list) {
     GDir *dir;
     const gchar *entry;
     GList *index, *dirList = NULL;
+	gchar *path = NULL;
     dir = g_dir_open(dir_name, 0, &err);
     if (err != NULL) {
         g_printerr("%s", err->message);
@@ -96,7 +100,7 @@ static void scan_dir(const gchar *dir_name, play_list_t *play_list) {
         if (entry[0] == '.') {
             continue;
         }
-        gchar *path = g_build_filename(dir_name, entry, NULL);
+        path = g_build_filename(dir_name, entry, NULL);
         if (g_file_test(path, G_FILE_TEST_IS_DIR)) {
             dirList = g_list_append(dirList, path);
         } else if (g_file_test(path, G_FILE_TEST_IS_REGULAR)) {
@@ -130,9 +134,10 @@ static void analyze_streams(gst_data *data) {
     gint i;
     GstTagList *tags;
     gchar *str;
+	play_list_t * play_list = NULL;
     guint rate;
     g_print("analyze_streams \n");
-    play_list_t * play_list = data->play_list;
+    play_list = data->play_list;
     for (i = 0; i < 1; i++) {
         tags = NULL;
         /* Retrieve the stream's audio tags */
@@ -275,6 +280,19 @@ void player_prev(gst_data *pdata) {
     }
 }
 
+void player_toggle_play_pause(gst_data *pdata) {
+    if(pdata->state == cust_play){
+        pdata->state =cust_pause;
+        player_play(pdata);
+
+    }else{
+        if (pdata->state == cust_list_have) {
+            pdata->state =cust_play;
+            player_next(pdata);
+        }
+    }
+}
+
 void player_next(gst_data *pdata) {
 
     if (pdata->state != cust_list_empty) {
@@ -282,6 +300,7 @@ void player_next(gst_data *pdata) {
         play(pdata, TRUE);
     }
 }
+
 int ns2s(gint64 ns){
     return (ns/1000/1000/1000);
 }
@@ -305,9 +324,8 @@ char *play_query_status(gst_data *pdata, char *buf) {
     return buf;
 }
 
-char *play_query_file_names(gst_data *pdata, int min,int max, char *buf) {
-    play_list_get_file_names(pdata->play_list, min, max, buf);
-    return buf;
+int play_query_file_names(gst_data *pdata, int min,int max, char *buf, const char *prefix) {
+    return play_list_get_file_names(pdata->play_list, min, max, buf, prefix);
 }
 
 
@@ -345,11 +363,12 @@ char *play_query_position(gst_data *pdata, char *buf) {
 
 
 void player_play(gst_data *pdata) {
+	GstElement *playbin = NULL;
     switch (pdata->state) {
         case cust_pause: {
             g_print(" cust_pause  \n");
             pdata->state = cust_play;
-            GstElement *playbin = pdata->playbin;
+            playbin = pdata->playbin;
             gst_element_set_state(playbin, GST_STATE_PLAYING);
         }
         case cust_list_have: {
@@ -392,13 +411,14 @@ void player_list_remove(gst_data *pdata, const char *dir_name) {
 }
 
 static void music_song_remove(gst_data *pdata, const gchar *dir_name) {
+	GstElement *playbin = NULL;
     char *dir = gst_filename_to_uri(dir_name, NULL);
     play_list_remove_by_name(pdata->play_list, dir);
     g_free(dir);
     // 判断为空列表时， 停住并且释放播放信息
     if (play_list_is_empty(pdata->play_list)) {
         pdata->state = cust_list_empty;
-        GstElement *playbin = pdata->playbin;
+        playbin = pdata->playbin;
         gst_element_set_state(playbin, GST_STATE_READY);
         gst_element_set_state(playbin, GST_STATE_NULL);
     }
@@ -424,22 +444,6 @@ static void music_init(gst_data *data) {
     data->state = cust_list_empty;
 }
 
-#if 1
-
-void *add_function(void *data) {
-    gst_data *pdata = (gst_data *) data;
-    for (int i = 0; i < 2; i++) {
-        sleep(5);
-        g_print("----------------------add-------------------------\n");
-        player_list_add(pdata, "/home/bingo/music2");
-        sleep(15);
-        g_print("----------------------remove-----------------------\n");
-        player_list_remove(pdata, "/home/bingo/music2");
-    }
-    return NULL;
-}
-
-#endif
 
 int main(int argc, char *argv[]) {
     gst_data data;
