@@ -249,12 +249,16 @@ void play_list_destroy(play_list_t **play_list) {
 
 gchar *play_list_next(play_list_t *play_list) {
 	gchar *pch = NULL;
+	
 	pthread_mutex_lock(&play_list->lock);
+	
 	if (g_list_length(play_list->songs) == 1) {
 		pthread_mutex_unlock(&play_list->lock);
 		return NULL;
 	}
 	play_list_clear_titil_album_artist(play_list);
+	play_list->iterator = play_list->iterator->next;
+	
 	if (!play_list->iterator) {
 		play_list->iterator = play_list->songs;
 	}
@@ -263,7 +267,6 @@ gchar *play_list_next(play_list_t *play_list) {
 	}
 
 	pch = ((song_t *) play_list->iterator->data)->file_name;
-	play_list->iterator = play_list->iterator->next;
 	pthread_mutex_unlock(&play_list->lock);
 	return pch;
 }

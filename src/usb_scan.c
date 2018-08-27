@@ -97,8 +97,8 @@ int ue_wait_for_event(struct uevent_listener *l, struct uevent *uevp) {
     return ERR_LISTENER_POLL;
 }
 
-usb_monitor_t *usb_monitor_new() {
-    usb_monitor_t *monitor = g_new(usb_monitor_t, 1);
+socket_observer_t *usb_monitor_new() {
+    socket_observer_t *monitor = g_new(socket_observer_t, 1);
     g_assert(monitor != NULL);
     ue_init_listener(&monitor->listener);
     monitor->should_quit = FALSE;
@@ -107,7 +107,7 @@ usb_monitor_t *usb_monitor_new() {
 
 
 
-void usb_monitor_destor(usb_monitor_t **pp_usb_monitor) {
+void usb_monitor_destor(socket_observer_t **pp_usb_monitor) {
     g_free(*pp_usb_monitor);
     *pp_usb_monitor = NULL;
 }
@@ -129,7 +129,7 @@ static gboolean  parse( gchar * buf, const gchar * line){
     g_regex_unref(regex);
 }
 
-void usb_monitior_blocked_notice(usb_monitor_t * usb_monitor, FUNC mount_cb, FUNC unmount_cb, gpointer userdata){
+void usb_monitior_blocked_notice(socket_observer_t * usb_monitor, FUNC mount_cb, FUNC unmount_cb, gpointer userdata){
     int re, len;
     char * pch;
     struct uevent uev;

@@ -25,15 +25,15 @@ typedef struct {
     int client[FD_SIZE];
     GList * write_buf;
 
-}usb_monitor_t;
+}socket_observer_t;
 
 
-usb_monitor_t *usb_monitor_new(void);
+socket_observer_t *usb_monitor_new(void);
 
-void usb_monitior_blocked_notice(usb_monitor_t * usb_monitor, gpointer userdata);
+void usb_monitior_blocked_notice(socket_observer_t * usb_monitor, gpointer userdata);
 
 
-void usb_monitor_destor(usb_monitor_t ** pp_usb_monitor);
+void usb_monitor_destor(socket_observer_t ** pp_usb_monitor);
 
 
 #endif //GST_PLAY_USB_SCAN_H

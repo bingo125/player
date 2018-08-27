@@ -5,43 +5,52 @@
 #ifndef GST_PLAY_PLAYER_H
 #define GST_PLAY_PLAYER_H
 
+
 #include <glib.h>
-typedef struct _gst_data gst_data;
+#include <gstreamer-1.0/gst/gst.h>
 
-void player_list_add(gst_data *pdata, const char *dir_name);
+#include "play_list.h"
+#include "socket_observer.h"
+#include "player_opt.h"
 
-void player_list_remove(gst_data *pdata, const char *dir_name);
 
-void volume_down(gst_data *pdata);
+typedef struct _gst_data {
+    play_list_t *play_list;
+    GstElement *playbin;
+    GMainLoop *loop;
+    socket_observer_t *usb_monitor;
+    player_opt_t player_opt;
+    GstBus *bus;
+} gst_data_t;
 
-void volume_up(gst_data *pdata);
 
-void player_next(gst_data *pdata);
+char *player_query_duration(gst_data_t *pdata, char *buf);
 
-void player_toggle_play_pause(gst_data *pdata);
+char *player_query_position(gst_data_t *pdata, char *buf);
 
-void player_prev(gst_data *pdata);
+char *player_query_status(gst_data_t *pdata, char *buf);
 
-void player_play(gst_data *pdata);
+char *player_query_abulum(gst_data_t *pdata, char *buf);
 
-void player_pause(gst_data *pdata);
+int   player_query_file_names(gst_data_t *pdata, int min, int max, char *buf,const char *prefix);
 
-char *play_query_duration(gst_data *pdata, char *buf);
+char *player_query_title(gst_data_t *pdata, char *buf);
 
-char *play_query_position(gst_data *pdata, char *buf);
+char *player_query_singer(gst_data_t *pdata, char *buf);
 
-char *play_query_status(gst_data *pdata, char *buf);
+char *player_query_totals_songs(gst_data_t *pdata, char *buf);
 
-char *play_query_abulum(gst_data *pdata, char *buf);
+char *player_query_cur_offset(gst_data_t *pdata, char *buf);
 
-int play_query_file_names(gst_data *pdata, int min, int max, char *buf,const char *prefix);
+void player_init(gst_data_t *data);
 
-char *play_query_title(gst_data *pdata, char *buf);
+gboolean new_player(gst_data_t *pdata);
 
-char *play_query_singer(gst_data *pdata, char *buf);
+void player_destory(gst_data_t *pdata) ;
 
-char *play_query_totals_songs(gst_data *pdata, char *buf);
+player_opt_t * player_get_opt(gst_data_t *pdata);
 
-char *play_query_cur_offset(gst_data *pdata, char *buf);
+void player_runing(gst_data_t *data);
+
 
 #endif //GST_PLAY_PLAYER_H

@@ -3,7 +3,7 @@
 //
 
 
-#include "usb_scan.h"
+#include "socket_observer.h"
 #include <sys/socket.h>
 #include <arpa/inet.h>
 #include <memory.h>
@@ -11,18 +11,19 @@
 #include <unistd.h>
 #include <errno.h>
 #include <stdio.h>
+#include "player.h"
 
 #define PORT 9990   //端口号
 #define SIZE 1024   //定义的数组大小
-static void usb_scan_add_write_buf(usb_monitor_t *usb_monitor, int fd, char *pch);
+static void usb_scan_add_write_buf(socket_observer_t *usb_monitor, int fd, char *pch);
+void handle_write_message(socket_observer_t *usb_monitor);
+static void handle_recieve_message(socket_observer_t *usb_monitor, int fd, char *message);
+
+
 
 typedef void (*FUNC)(gpointer userdata, char *mount);
 
-//void usb_monitior_blocked_notice(usb_monitor_t *usb_monitor, FUNC mount_cb, FUNC unmount_cb, gpointer userdata);
-
-
-
-
+//void usb_monitior_blocked_notice(socket_observer_t *usb_monitor, FUNC mount_cb, FUNC unmount_cb, gpointer userdata);
 
 static int Creat_socket(void)    //创建套接字和初始化以及监听函数
 {
@@ -59,14 +60,14 @@ static int Creat_socket(void)    //创建套接字和初始化以及监听函数
     return listen_socket;
 }
 
-usb_monitor_t *usb_monitor_new(void) {
-    usb_monitor_t *usb_monitor = g_new0(usb_monitor_t, 1);
+socket_observer_t *usb_monitor_new(void) {
+    socket_observer_t *usb_monitor = g_new0(socket_observer_t, 1);
     usb_monitor->listen_socket = Creat_socket();
     memset(&usb_monitor->client, -1, sizeof(usb_monitor->client));
     return usb_monitor;
 }
 //
-//void usb_monitior_blocked_notice(usb_monitor_t *usb_monitor, FUNC mount_cb, FUNC unmount_cb, gpointer userdata) {
+//void usb_monitior_blocked_notice(socket_observer_t *usb_monitor, FUNC mount_cb, FUNC unmount_cb, gpointer userdata) {
 //    usb_monitor->mount = mount_cb;
 //    usb_monitor->unmount_cb = unmount_cb;
 //    usb_monitor->userdata = userdata;
@@ -76,7 +77,7 @@ usb_monitor_t *usb_monitor_new(void) {
 
 void *pthread_runting(void *userdata);
 
-void usb_monitior_blocked_notice(usb_monitor_t *usb_monitor, gpointer userdata) {
+void usb_monitior_blocked_notice(socket_observer_t *usb_monitor, gpointer userdata) {
     //    usb_monitor->mount = mount_cb;
     //    usb_monitor->unmount_cb = unmount_cb;
     usb_monitor->userdata = userdata;
@@ -84,7 +85,7 @@ void usb_monitior_blocked_notice(usb_monitor_t *usb_monitor, gpointer userdata) 
     usb_monitor->should_quit = FALSE;
 }
 
-void usb_monitor_destor(usb_monitor_t **pp_usb_monitor) {
+void usb_monitor_destor(socket_observer_t **pp_usb_monitor) {
     int i;
     (*pp_usb_monitor)->should_quit = TRUE;
     pthread_join((*pp_usb_monitor)->id, NULL);
@@ -100,9 +101,9 @@ void usb_monitor_destor(usb_monitor_t **pp_usb_monitor) {
     g_free(*pp_usb_monitor);
     *pp_usb_monitor = NULL;
 }
-void handle_write_message(usb_monitor_t *usb_monitor) ;
 
-void handle_write_message(usb_monitor_t *usb_monitor) {
+
+void handle_write_message(socket_observer_t *usb_monitor) {
 
     GList *iterator = usb_monitor->write_buf;
     write_buf_t *write_buf = NULL;
@@ -116,7 +117,31 @@ void handle_write_message(usb_monitor_t *usb_monitor) {
     usb_monitor->write_buf = NULL;
 }
 
-static void handle_recieve_message(usb_monitor_t *usb_monitor, int fd, char *message);
+void handle_player_message(socket_observer_t *usb_monitor) {
+	gst_data_t * gst = (gst_data_t *)usb_monitor->userdata;
+	player_opt_t * popt = player_get_opt (gst);
+	char * pch = NULL;
+	int * p_socket =usb_monitor->client;
+	int i  = 0 ;
+	
+	for(i  = 0; i < FD_SIZE; i ++){
+		if(*p_socket > 2){
+			break;
+		}
+		p_socket ++;
+	}
+
+	if(i == FD_SIZE){
+		return ;
+	}
+	
+	while((pch =  player_opt_event_pop_font(popt))!=NULL){
+		handle_recieve_message(usb_monitor, *p_socket, pch);		
+	}
+}
+
+
+
 
 void *pthread_runting(void *userdata) {
 
@@ -128,7 +153,7 @@ void *pthread_runting(void *userdata) {
     fd_set fds;
     int client_fd;
 	struct timeval time_lapse;
-	usb_monitor_t *usb_monitor = (usb_monitor_t *) userdata;
+	socket_observer_t *usb_monitor = (socket_observer_t *) userdata;
     FD_ZERO(&fds);
     FD_SET(usb_monitor->listen_socket, &fds);
     maxfd = usb_monitor->listen_socket;
@@ -136,13 +161,14 @@ void *pthread_runting(void *userdata) {
 
     while (!usb_monitor->should_quit) {
         fd_set tmp_fds = fds;
-        time_lapse.tv_sec = 0;
-        time_lapse.tv_usec = 10 * 1000;
+        time_lapse.tv_sec = 1;
+        time_lapse.tv_usec = 0;
 
         switch (select(maxfd + 1, &tmp_fds, NULL, NULL, &time_lapse)) {
         case 0:
             //                printf(" time is time_lapse and try again \n");
             handle_write_message(usb_monitor);
+            handle_player_message(usb_monitor);
             break;
         case -1:perror(" xxxxxx");
             break;
@@ -164,10 +190,14 @@ void *pthread_runting(void *userdata) {
                     close(client_fd);
                     // 链接端口太多
                 }
+       
             } else {
                 for (i = 0; i < FD_SIZE; i++) {
-                    if (usb_monitor->client[i] == -1)
-                        continue;
+                    if (usb_monitor->client[i] == -1){
+                    // 此处有内存泄露，但是问题不大，正常连接过程中，socket会一直建立，泄露只有几个字节而已。
+                    	continue;
+                    }
+                        
                     if (FD_ISSET(usb_monitor->client[i], &tmp_fds)) {
                         ret = recv(usb_monitor->client[i], buf, SIZE - 1, MSG_DONTWAIT);
                         if (ret <= 0) {
@@ -185,7 +215,6 @@ void *pthread_runting(void *userdata) {
                             }
                             printf("%d---------%s \n", ret, buf);
                             handle_recieve_message(usb_monitor, usb_monitor->client[i], buf);
-
                         }
                     }
                 }
@@ -208,7 +237,7 @@ static gboolean call_back_match(const callback_t *p_cb, gchar *message, int *pi)
     return TRUE;
 }
 
-static void handle_recieve_message(usb_monitor_t *usb_monitor, int fd, char *message) {
+static void handle_recieve_message(socket_observer_t *usb_monitor, int fd, char *message) {
     char *pch = NULL;
     int i;
     callback_t *ptr_cb = net_impl_cbs();
@@ -235,7 +264,7 @@ static void handle_recieve_message(usb_monitor_t *usb_monitor, int fd, char *mes
     g_print("unspect message %s \n", message);
 }
 
-static void usb_scan_add_write_buf(usb_monitor_t *usb_monitor, int fd, char *pch){
+static void usb_scan_add_write_buf(socket_observer_t *usb_monitor, int fd, char *pch){
     write_buf_t *ret_val = NULL;
     ret_val = g_new0(write_buf_t, 1);
     ret_val->fd = fd;

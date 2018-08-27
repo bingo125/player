@@ -9,7 +9,7 @@
 //int main() {
 ////    printf(" hello wrold \n");
 ////
-////    usb_monitor_t * p_usb = usb_monitor_new();
+////    socket_observer_t * p_usb = usb_monitor_new();
 ////    usb_monitior_blocked_notice(p_usb, NULL, NULL,NULL);
 //    return 0;
 //}

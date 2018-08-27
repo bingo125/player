@@ -7,11 +7,12 @@
 
 #include "net_impl.h"
 #include "player.h"
+#include "socket_observer.h"
 #include "protocol.h"
-#include "usb_scan.h"
-static GList ** _write_buf = NULL;
 
-char *play_info_pause_cb(callback_t *cb, char *cmd, gpointer userdata) ;
+#define BUF_SZ 128
+
+//char *play_info_pause_cb(callback_t *cb, char *cmd, gpointer userdata) ;
 char *player_feedback_status_cb(callback_t *cb, char *cmd, gpointer userdata);
 char *player_info_songs_name_cb(callback_t *cb, char *cmd, gpointer userdata) ;
 char *player_info_abulum_cb(callback_t *cb, char *cmd, gpointer userdata) ;
@@ -33,7 +34,7 @@ char *player_prev_cb(callback_t *cb ,char *cmd,gpointer userdata);
 
 char *player_play_cb(callback_t *cb ,char *cmd,gpointer userdata);
 
-char *player_pause_cb(callback_t *cb ,char *cmd,gpointer userdata) ;
+char *player_pause_cb(callback_t *cb ,char *cmd,gpointer userdata);
 
 char *player_info_cur_cb(callback_t *cb ,char *cmd,gpointer userdata);
 
@@ -41,59 +42,69 @@ char *player_info_duration_cb(callback_t *cb, char *cmd, gpointer userdata);
 //callback_t *net_impl_cbs();
 
 char *mount_cb(callback_t *cb, char *cmd, gpointer userdata) {
-
+	gst_data_t* data =(gst_data_t*)userdata;
+	player_opt_t * opt = player_get_opt(data);
+	player_opt_set_cmd_with_buf(opt,add_player_list, cmd);
 	g_print("mount:%s\n", cmd);
-	player_list_add(userdata, cmd);
-	player_next_cb(cb, userdata, cmd);
 	return NULL;
 }
 
 char *unmount_cb(callback_t *cb, char *cmd, gpointer userdata) {
-	g_print("unmount_cb:%s\n", cmd);
-	player_list_remove(userdata, cmd);
+	gst_data_t* data =(gst_data_t*)userdata;
+	player_opt_t * opt = player_get_opt(data);
+	player_opt_set_cmd_with_buf(opt,remove_player_list, cmd);
+	g_print("mount:%s\n", cmd);
 	return NULL;
 }
 
 char *player_toggle_play_pause_cb(callback_t *cb, char *cmd, gpointer userdata) {
 	g_print("player_next_cb:\n");
-	player_toggle_play_pause(userdata);
+	gst_data_t* data =(gst_data_t*)userdata;
+	player_opt_t * opt = player_get_opt(data);
+	player_opt_set_cmd(opt, usr_play_toggle);
 	return NULL;
 }
+
 char *player_next_cb(callback_t *cb, char *cmd, gpointer userdata) {
 	g_print("player_next_cb:\n");
-	player_next(userdata);
+	gst_data_t* data =(gst_data_t*)userdata;
+	player_opt_t * opt = player_get_opt(data);
+	player_opt_set_cmd(opt, usr_next);
 	return NULL;
 }
 
 char *player_prev_cb(callback_t *cb, char *cmd, gpointer userdata) {
 	g_print("player_prev_cb:\n");
-	player_prev(userdata);
+	gst_data_t* data =(gst_data_t*)userdata;
+	player_opt_t * opt = player_get_opt(data);
+	player_opt_set_cmd(opt, usr_previours);
 	return NULL;
 }
 
 char *player_play_cb(callback_t *cb, char *cmd, gpointer userdata) {
-	g_print("player_play_cb:\n");
-	player_play(userdata);
+	gst_data_t* data =(gst_data_t*)userdata;
+	player_opt_t * opt = player_get_opt(data);
+	player_opt_set_cmd(opt, usr_play);
 	return NULL;
 }
 
 char *player_pause_cb(callback_t *cb, char *cmd, gpointer userdata) {
-	g_print("player_pause_cb:\n");
-	player_pause(userdata);
+	gst_data_t* data =(gst_data_t*)userdata;
+	player_opt_t * opt = player_get_opt(data);
+	player_opt_set_cmd(opt, usr_pause);
 	return NULL;
 }
 
-char *play_info_pause_cb(callback_t *cb, char *cmd, gpointer userdata) {
-	g_print("play_info_pause:\n");
-	return strdup("player info plause");
-}
-
-#define BUF_SZ 128
+//char *play_info_pause_cb(callback_t *cb, char *cmd, gpointer userdata) {
+//	g_print("play_info_pause:\n");
+//	player_q
+//	return strdup("player info plause");
+//}
 
 char *player_info_cur_cb(callback_t *cb, char *cmd, gpointer userdata) {
 	char buf[BUF_SZ];
 	char ret[BUF_SZ];
-	play_query_position(userdata, buf);
+	player_query_position(userdata, buf);
 	sprintf(ret, "%s=%s", cb->freeback, buf);
 	return strdup(ret);
 }
@@ -101,7 +112,7 @@ char *player_info_cur_cb(callback_t *cb, char *cmd, gpointer userdata) {
 char *player_info_duration_cb(callback_t *cb, char *cmd, gpointer userdata) {
 	char buf[BUF_SZ];
 	char ret[BUF_SZ];
-	play_query_duration(userdata, buf);
+	player_query_duration(userdata, buf);
 	sprintf(ret, "%s=%s", cb->freeback, buf);
 	return strdup(ret);
 }
@@ -109,12 +120,11 @@ char *player_info_duration_cb(callback_t *cb, char *cmd, gpointer userdata) {
 char *player_feedback_status_cb(callback_t *cb, char *cmd, gpointer userdata) {
 	char buf[BUF_SZ];
 	char ret[BUF_SZ];
-	play_query_status(userdata, buf);
+	player_query_status(userdata, buf);
 	sprintf(ret, "%s=%s", cb->freeback, buf);
 	return strdup(ret);
 }
 
-#include "player.h"
 char *player_info_songs_name_cb(callback_t *cb, char *cmd, gpointer userdata) {
 	char buf[BUFSIZ] ={0};
 	int len;
@@ -123,8 +133,6 @@ char *player_info_songs_name_cb(callback_t *cb, char *cmd, gpointer userdata) {
 	gchar *pch = NULL;
 	gint min , max;
 	min = max = -1;
-
-
 	regex = g_regex_new("[0-9]+", 0 , 0, NULL);
 	g_regex_match(regex, cmd, 0, &match_info);
 	while (g_match_info_matches(match_info)) {
@@ -140,7 +148,7 @@ char *player_info_songs_name_cb(callback_t *cb, char *cmd, gpointer userdata) {
 	}
 	g_match_info_free(match_info);
 	g_regex_unref(regex);
-	len = play_query_file_names(userdata, min, max, buf,cb->freeback);
+	len = player_query_file_names(userdata, min, max, buf,cb->freeback);
 	pch=(gchar*) malloc(500);
 	memcpy(pch ,buf, len);
 	return pch;
@@ -150,7 +158,7 @@ char *player_info_songs_name_cb(callback_t *cb, char *cmd, gpointer userdata) {
 char *player_info_abulum_cb(callback_t *cb, char *cmd, gpointer userdata) {
 	char buf[BUF_SZ];
 	char ret[BUF_SZ];
-	play_query_abulum(userdata, buf);
+	player_query_abulum(userdata, buf);
 	sprintf(ret, "%s=%s", cb->freeback, buf);
 	return strdup(ret);
 }
@@ -158,7 +166,7 @@ char *player_info_abulum_cb(callback_t *cb, char *cmd, gpointer userdata) {
 char *player_info_singer_cb(callback_t *cb, char *cmd, gpointer userdata) {
 	char buf[BUF_SZ];
 	char ret[BUF_SZ];
-	play_query_singer(userdata, buf);
+	player_query_singer(userdata, buf);
 	sprintf(ret, "%s=%s", cb->freeback, buf);
 	return strdup(ret);
 }
@@ -166,7 +174,7 @@ char *player_info_singer_cb(callback_t *cb, char *cmd, gpointer userdata) {
 char *player_info_title_cb(callback_t *cb, char *cmd, gpointer userdata) {
 	char buf[BUF_SZ];
 	char ret[BUF_SZ];
-	play_query_title(userdata, buf);
+	player_query_title(userdata, buf);
 	sprintf(ret, "%s=%s", cb->freeback, buf);
 	return strdup(ret);
 }
@@ -174,7 +182,7 @@ char *player_info_title_cb(callback_t *cb, char *cmd, gpointer userdata) {
 char *player_info_cur_offset_cb(callback_t *cb, char *cmd, gpointer userdata) {
 	char buf[BUF_SZ];
 	char ret[BUF_SZ];
-	play_query_cur_offset(userdata, buf);
+	player_query_cur_offset(userdata, buf);
 	sprintf(ret, "%s=%s", cb->freeback, buf);
 	return strdup(ret);
 }
@@ -182,7 +190,7 @@ char *player_info_cur_offset_cb(callback_t *cb, char *cmd, gpointer userdata) {
 char *player_info_totals_songs_cb(callback_t *cb, char *cmd, gpointer userdata) {
 	char buf[BUF_SZ];
 	char ret[BUF_SZ];
-	play_query_totals_songs(userdata, buf);
+	player_query_totals_songs(userdata, buf);
 	sprintf(ret, "%s=%s", cb->freeback, buf);
 	return strdup(ret);
 }
@@ -287,9 +295,4 @@ static callback_t callbacks[] = {
 //todo 后续此处使用二叉搜索，加快搜索速度
 callback_t *net_impl_cbs(void) {
 	return callbacks;
-}
-
-
-void net_impl_set_buf(GList** buf){
-	_write_buf = buf;
 }
